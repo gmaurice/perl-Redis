@@ -131,8 +131,8 @@ sub AUTOLOAD {
 		}
 		return $hash;
 	} elsif ( $command eq 'keys' ) {
-		my $keys = $self->__read_bulk($result);
-		return split(/\s/, $keys) if $keys;
+		my @keys = $self->__read_multi_bulk($result);
+		return @keys if @keys;
 		return;
 	}
 
