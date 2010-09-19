@@ -52,6 +52,9 @@ sub new {
 	) || die $!;
 
 	bless($self, $class);
+
+	$self->{server_version} = substr( $self->info->{redis_version}, 0, 1);
+
 	$self;
 }
 
@@ -131,8 +134,13 @@ sub AUTOLOAD {
 		}
 		return $hash;
 	} elsif ( $command eq 'keys' ) {
-		my @keys = $self->__read_multi_bulk($result);
-		return @keys if @keys;
+		if ( $self->{server_version} == 2){
+			my @keys = $self->__read_multi_bulk($result);
+			return @keys if @keys;
+		}elsif( $self->{server_version} == 1){
+			my $keys = $self->__read_bulk($result);
+			return split(/\s/, $keys) if $keys;
+		}
 		return;
 	}
 
