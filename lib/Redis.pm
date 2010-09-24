@@ -60,6 +60,7 @@ sub new {
 
 my $bulk_command = {
 	set => 1,	setnx => 1,
+	mset => 1,	msetnx => 1,
 	rpush => 1,	lpush => 1,
 	lset => 1,	lrem => 1,
 	sadd => 1,	srem => 1,
@@ -67,10 +68,14 @@ my $bulk_command = {
 	echo => 1,
 	getset => 1,
 	smove => 1,
-	zadd => 1,
-	zrem => 1,
+	zadd => 1,	zrem => 1,
 	zscore => 1,
+	zrank => 1,    zrevrank => 1,
 	zincrby => 1,
+	hset => 1,     hmset => 1,     hsetnx => 1,
+	hget => 1,     hmget => 1,
+	hdel => 1,
+	hexists => 1,
 	append => 1,
 };
 

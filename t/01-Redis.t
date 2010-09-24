@@ -3,7 +3,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 110;
+use Test::More tests => 132;
 use Data::Dumper;
 
 use lib 'lib';
@@ -39,12 +39,20 @@ ok( $o->set( 'test-undef' => undef ), 'set undef' );
 ok( ! defined $o->get( 'test-undef' ), 'get undef' );
 ok( $o->exists( 'test-undef' ), 'exists undef' );
 
+$o->del('test-undef');
 $o->del('non-existant');
 
 ok( ! $o->exists( 'non-existant' ), 'exists non-existant' );
 ok( ! $o->get( 'non-existant' ), 'get non-existant' );
 
 ok( $o->set('key-next' => 0), 'key-next = 0' );
+
+$o->set('key-expire', 1);
+
+#Since Redis v2.1.3
+#ok( $o->persist('key-expire') );
+
+ok( $o->expire('key-expire', 0), 'key-expire in 0 second');
 
 my $key_next = 3;
 
@@ -91,6 +99,8 @@ ok( $@, 'rename to existing key' );
 
 ok( my $nr_keys = $o->dbsize, 'dbsize' );
 
+$o->del('test-decrby');
+$o->del('test-renamed');
 
 diag "Commands operating on lists";
 
@@ -123,6 +133,38 @@ cmp_ok( $o->lpop( $list ), 'eq', 'r1', 'lpop' );
 
 ok( ! $o->rpop( $list ), 'rpop' );
 
+diag "Commands operating on hashes";
+
+my $hash = 'test-hash';
+
+$o->del($hash) && diag "cleanup $hash from last run";
+
+ok( $o->mset( foo => 'bar', foo1 => 'bar1' ), 'mset' );
+
+ok( $o->msetnx( foo2 => 'bar', foo3 => 'bar1' ), 'msetnx' );
+
+$o->del('foo2');
+$o->del('foo3');
+
+ok( $o->hset( $hash , 'field1', 'val1' ), 'hset' );
+
+cmp_ok( $o->type($hash), 'eq', 'hash', 'type' );
+
+cmp_ok( $o->hlen( $hash ), '==', 1, 'hlen' );
+
+ok( $o->hexists( $hash, 'field1') , 'hexists');
+
+cmp_ok( $o->hget( $hash , 'field1' ), 'eq', 'val1', 'hget' );
+
+ok( $o->hdel( $hash , 'field1' ), 'hdel' );
+
+$o->del($hash);
+
+ok( $o->hmset( $hash , 'field1', 'val1', 'field2', 'val2' ), 'hmset' );
+
+is_deeply( { $o->hgetall( $hash ) } , { 'field1' => 'val1', 'field2' => 'val2' }, 'hgetall' );
+
+$o->del($hash);
 
 diag "Commands operating on sets";
 
@@ -151,6 +193,52 @@ ok( $o->sinterstore( 'test-set-inter', 'test-set1', 'test-set2' ), 'sinterstore'
 
 cmp_ok( $o->scard( 'test-set-inter' ), '==', $#$inter + 1, 'cardinality of intersection' );
 
+$o->del('test-set-inter');
+$o->del('test-set1');
+$o->del('test-set2');
+
+diag "Commands operating on sorted sets";
+
+my $zset = 'test-zset';
+$o->del($zset);
+
+ok( $o->zadd( $zset, 1, 'foo' ), 'zadd' );
+
+ok( ! $o->zadd( $zset, 1, 'foo' ), 'zadd' );
+
+cmp_ok( $o->zcard( $zset ), '==', 1, 'zcard' );
+
+cmp_ok( $o->type( $zset ), 'eq', 'zset', 'type is zset' );
+
+$o->zadd( $zset, 0, 'foo0' );
+
+cmp_ok( $o->zrank( $zset, 'foo' ), '==', 1, 'zrank' );
+
+is_deeply( [ $o->zrange( $zset, 0, 1 ) ] , [ 'foo0', 'foo'] , 'zrange' );
+
+$o->zrem( $zset, 'foo0' );
+
+ok( $o->zrem( $zset, 'foo' ), 'zrem' );
+
+ok( ! $o->zrem( $zset, 'foo' ), 'zrem again' );
+
+cmp_ok( $o->zcard( $zset ), '==', 0, 'zcard' );
+
+$o->zadd( 'test-zset1', 1, $_ ) foreach ( 'foo', 'bar', 'baz' );
+$o->zadd( 'test-zset2', 1, $_ ) foreach ( 'foo', 'baz', 'xxx' );
+
+$inter = [ 'baz', 'foo' ];
+
+ok( $o->zinterstore( 'test-zset-inter', 2, 'test-zset1', 'test-zset2' ), 'zinterstore' );
+
+is_deeply( [ $o->zrangebyscore( 'test-zset-inter', 1, 2 ) ], $inter, 'zinterstore' );
+ 
+cmp_ok( $o->zcard( 'test-zset-inter' ), '==', $#$inter + 1, 'cardinality of intersection' );
+
+$o->del($zset);
+$o->del('test-zset-inter');
+$o->del('test-zset1');
+$o->del('test-zset2');
 
 diag "Multiple databases handling commands";
 

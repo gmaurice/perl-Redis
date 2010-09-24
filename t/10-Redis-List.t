@@ -26,3 +26,4 @@ is_deeply( [ @a ], [ 'foo', 'bar', 'baz' ] );
 ok( push( @a, 'push' ), 'push' );
 is_deeply( [ @a ], [ 'foo', 'bar', 'baz', 'push' ] );
 
+$o->del('test-redis-list');
