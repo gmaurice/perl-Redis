@@ -270,8 +270,12 @@ sub __send_command {
 
 sub __read_response {
   my ($self, $command, $type_r) = @_;
+  my $sock = $self->{sock};
 
-  my ($type, $result) = $self->__read_sock;
+  my $result = <$sock> || die "can't read socket: $!";
+  my $type = substr($result,0,1);
+  $result = substr($result,1,-2);
+
   $$type_r = $type if $type_r;
 
   if ($type eq '-') {
@@ -311,27 +315,10 @@ sub __read_sock {
   my $read_size = $self->{read_size};
   $read_size = $len + 2 if defined $len && $len + 2 > $read_size;
 
-  while (1) {
-    ## Read NN bytes, strip \r\n at the end
-    if (defined $len) {
-      if (length($$rbuf) >= $len + 2) {
-        $data = substr(substr($$rbuf, 0, $len + 2, ''), 0, -2);
-        last;
-      }
-    }
-    ## No len, means line more, read until \r\n
-    elsif ($$rbuf =~ s/^(.)([^\015\012]*)\015\012//) {
-      ($type, $data) = ($1, $2);
-      last;
-    }
+  $data = <$sock>;
+  $data = substr( $data, 0, -2); # best
 
-    my $bytes = sysread $sock, $$rbuf, $read_size, length $$rbuf;
-    confess("Error while reading from Redis server: $!")
-      unless defined $bytes;
-    confess("Redis server closed connection") unless $bytes;
-  }
-
-  $data = decode($enc, $data) if $enc;
+  #$data = decode($enc, $data) if $enc; # should we add an option to enable the feature ?
   warn "[RECV] '$type$data'" if $self->{debug};
 
   return ($type, $data) if $type;
